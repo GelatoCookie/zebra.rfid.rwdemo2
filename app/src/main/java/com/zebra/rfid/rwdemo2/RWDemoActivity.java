@@ -26,6 +26,7 @@ import android.media.AudioManager;
 import android.media.ToneGenerator;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Parcelable;
 import android.os.SystemClock;
 import android.text.SpannableString;
@@ -44,7 +45,9 @@ import android.widget.TextView;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static com.zebra.rfid.rwdemo2.RWDemoIntentParams.*;
 
@@ -54,6 +57,8 @@ import static com.zebra.rfid.rwdemo2.RWDemoIntentParams.*;
  * To read RFID tags RWDemoActivity uses intent API of a DataWedge Application.
  */
 public class RWDemoActivity extends Activity implements OnClickListener,    OnMenuItemClickListener {
+    private View progressOverlay;
+    private TextView progressMessageText;
 
     private static final String TAG = RWDemoActivity.class.getSimpleName();
 
@@ -61,9 +66,8 @@ public class RWDemoActivity extends Activity implements OnClickListener,    OnMe
     private static final String DATA_STRING_TAG = "com.symbol.datawedge.data_string";
     private static final String MSR_DATA_TAG = "com.symbol.datawedge.msr_data";
 
-    private static final String DWAPI_START_SCANNING = "START_SCANNING";
-    private static final String DWAPI_STOP_SCANNING = "STOP_SCANNING";
-    private static final String DWAPI_TOGGLE_SCANNING = "TOGGLE_SCANNING";
+    private static final String TRIGGER_START = "START_SCANNING";
+    private static final String TRIGGER_STOP = "STOP_SCANNING";
 
     private static final String DATA_INTENT = "StartingIntent";
     private static final String DATA_TXT = "UIText";
@@ -91,6 +95,12 @@ public class RWDemoActivity extends Activity implements OnClickListener,    OnMe
     private static final int PROGRESS_BAR_WIDTH = 50;
     private static final int PROGRESS_BAR_HIGHT = 50;
 
+    // Timer mechanisms for robust timeout
+    private final Handler timeoutHandler = new Handler(Looper.getMainLooper());
+    private Runnable rfidTimeoutRunnable;
+    private Runnable barcodeTimeoutRunnable;
+    private static final long SCAN_TIMEOUT_MS = 5000;
+
     private String tvText = "";
     private ImageButton softScanTrigger;
     private ImageButton barcodeScanTrigger;
@@ -101,6 +111,11 @@ public class RWDemoActivity extends Activity implements OnClickListener,    OnMe
 
     private TextView scannerStatusText;
     private TextView rfidStatusText;
+    private TextView uniqueCountText;
+    private TextView totalCountText;
+
+    private Set<String> uniqueTags = new HashSet<>();
+    private int totalTags = 0;
 
     private static int DW_DEMO_POPUP_MENU_SETTINGS = 1;
 
@@ -205,6 +220,16 @@ public class RWDemoActivity extends Activity implements OnClickListener,    OnMe
 
         setContentView(R.layout.dwdemo_main);
         progressBar = findViewById(R.id.progressBar);
+        progressOverlay = findViewById(R.id.progressOverlay);
+        progressMessageText = findViewById(R.id.progressMessage);
+
+        // Tapping overlay stops the scan
+        if (progressOverlay != null) {
+            progressOverlay.setOnClickListener(v -> {
+                if (rfidScanState) stopRfidScan();
+                if (barcodeScanState) stopBarcodeScan();
+            });
+        }
 
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_NOSENSOR);
         setMainBackground();
@@ -221,6 +246,12 @@ public class RWDemoActivity extends Activity implements OnClickListener,    OnMe
                 return;
             }
             clickTime = SystemClock.elapsedRealtime();
+            
+            // Clear UI and counts before inventory
+            if (!rfidScanState) {
+                clearData();
+            }
+            
             toggleSoftRfidTrigger();
         });
 
@@ -231,15 +262,19 @@ public class RWDemoActivity extends Activity implements OnClickListener,    OnMe
                 return;
             }
             clickTime = SystemClock.elapsedRealtime();
+            
+            // Clear UI and counts before scan
+            if (!barcodeScanState) {
+                clearData();
+            }
+
             toggleSoftBarcodeTrigger();
         });
 
         actionBtnClear = (ImageButton) findViewById(R.id.actionButton1);
         actionBtnClear.setOnClickListener(v -> {
             if (v.getId() == actionBtnClear.getId()) {
-                TextView tv1 = (TextView) findViewById(R.id.output_view);
-                tv1.setText("");
-                tvText = "";
+                clearData();
             }
 
         });
@@ -261,12 +296,33 @@ public class RWDemoActivity extends Activity implements OnClickListener,    OnMe
 
         scannerStatusText = findViewById(R.id.scannerStatusText);
         rfidStatusText = findViewById(R.id.rfidStatusText);
+        uniqueCountText = findViewById(R.id.uniqueCountText);
+        totalCountText = findViewById(R.id.totalCountText);
 
         // Initial status UI
         updateStatusUI(scannerStatusText, R.string.status_scanner, getString(R.string.status_unknown));
         updateStatusUI(rfidStatusText, R.string.status_rfid, getString(R.string.status_unknown));
+        updateCountUI();
 
         thisContext = this;
+    }
+
+    private void clearData() {
+        runOnUiThread(() -> {
+            TextView tv1 = (TextView) findViewById(R.id.output_view);
+            tv1.setText("");
+            tvText = "";
+            uniqueTags.clear();
+            totalTags = 0;
+            updateCountUI();
+        });
+    }
+
+    private void updateCountUI() {
+        runOnUiThread(() -> {
+            uniqueCountText.setText("Unique: " + uniqueTags.size());
+            totalCountText.setText("Total: " + totalTags);
+        });
     }
 
     @Override
@@ -365,6 +421,10 @@ public class RWDemoActivity extends Activity implements OnClickListener,    OnMe
     public void onPause() {
         super.onPause();
 
+        // Stop scanning to preserve battery when leaving activity
+        stopRfidScan();
+        stopBarcodeScan();
+
         // These things should happen regardless of unregistering success or not.
         rwDemoProfileActivated = true;
         if (progressBar != null) {
@@ -392,12 +452,8 @@ public class RWDemoActivity extends Activity implements OnClickListener,    OnMe
     @Override
     public void onStop() {
         super.onStop();
-        if(rfidScanState == true) {
-            toggleSoftRfidTrigger();
-        }
-        if(barcodeScanState == true) {
-            toggleSoftBarcodeTrigger();
-        }
+        stopRfidScan();
+        stopBarcodeScan();
         System.gc();
     }
 
@@ -495,34 +551,105 @@ public class RWDemoActivity extends Activity implements OnClickListener,    OnMe
         rl.setBackgroundDrawable(ld);
     }
 
-    private void toggleSoftRfidTrigger() {
-        if (DEBUG) Log.d(TAG,"ECRT: toggleSoftRfidTrigger START scanState is:" +rfidScanState);
+    /**
+     * Helper to send trigger commands to DataWedge API
+     */
+    private void triggerHardware(String triggerExtra, String command) {
         Intent i = new Intent();
         i.setAction(RWDemoIntentParams.ACTION);
-        if (rfidScanState == true) {
-            i.putExtra(RWDemoIntentParams.ACTION_EXTRA_SOFT_RFID_TRIGGER, DWAPI_STOP_SCANNING);
-            rfidScanState = false;
+        i.putExtra(triggerExtra, command);
+        sendBroadcast(i);
+    }
+
+    private void toggleSoftRfidTrigger() {
+        if (rfidScanState) {
+            stopRfidScan();
         } else {
-            i.putExtra(RWDemoIntentParams.ACTION_EXTRA_SOFT_RFID_TRIGGER, DWAPI_START_SCANNING);
-            rfidScanState = true;
+            startRfidScan();
         }
-        if (DEBUG) Log.d(TAG, "ECRT: toggleSoftRfidTrigger END scanState is:" + rfidScanState);
-        this.sendBroadcast(i);
+    }
+
+    private void startRfidScan() {
+        if (rfidScanState) return; // Prevent double-clicks
+        rfidScanState = true;
+
+        showProgressDialog("Reading RFID... (Timeout in 5s)");
+        updateStatusUI(rfidStatusText, R.string.status_rfid, STATUS_SCANNING);
+
+        // 1. Send explicit START command
+        triggerHardware(ACTION_EXTRA_SOFT_RFID_TRIGGER, TRIGGER_START);
+
+        // 2. Define what happens when the timer runs out
+        rfidTimeoutRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (DEBUG) Log.i(TAG, "RFID timeout reached. Stopping hardware.");
+                stopRfidScan();
+            }
+        };
+
+        // 3. Start the countdown
+        timeoutHandler.postDelayed(rfidTimeoutRunnable, SCAN_TIMEOUT_MS);
+    }
+
+    private void stopRfidScan() {
+        if (!rfidScanState) return;
+        rfidScanState = false;
+
+        // CRITICAL: Cancel the timer so it doesn't fire anyway
+        if (rfidTimeoutRunnable != null) {
+            timeoutHandler.removeCallbacks(rfidTimeoutRunnable);
+            rfidTimeoutRunnable = null;
+        }
+
+        // Send explicit STOP command
+        triggerHardware(ACTION_EXTRA_SOFT_RFID_TRIGGER, TRIGGER_STOP);
+
+        dismissProgressDialog();
+        updateStatusUI(rfidStatusText, R.string.status_rfid, STATUS_WAITING);
     }
 
     private void toggleSoftBarcodeTrigger() {
-        if (DEBUG) Log.d(TAG,"ECRT: toggleSoftBarcodeTrigger START scanState is:" +barcodeScanState);
-        Intent i = new Intent();
-        i.setAction(RWDemoIntentParams.ACTION);
-        if (barcodeScanState == true) {
-            i.putExtra(RWDemoIntentParams.ACTION_EXTRA_SOFT_SCAN_TRIGGER, DWAPI_STOP_SCANNING);
-            barcodeScanState = false;
+        if (barcodeScanState) {
+            stopBarcodeScan();
         } else {
-            i.putExtra(RWDemoIntentParams.ACTION_EXTRA_SOFT_SCAN_TRIGGER, DWAPI_START_SCANNING);
-            barcodeScanState = true;
+            startBarcodeScan();
         }
-        if (DEBUG) Log.d(TAG, "ECRT: toggleSoftBarcodeTrigger END scanState is:" + barcodeScanState);
-        this.sendBroadcast(i);
+    }
+
+    private void startBarcodeScan() {
+        if (barcodeScanState) return;
+        barcodeScanState = true;
+
+        showProgressDialog("Reading Barcode... (Timeout in 5s)");
+
+        // Send explicit START command
+        triggerHardware(ACTION_EXTRA_SOFT_SCAN_TRIGGER, TRIGGER_START);
+
+        barcodeTimeoutRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (DEBUG) Log.i(TAG, "Barcode timeout reached. Stopping hardware.");
+                stopBarcodeScan();
+            }
+        };
+        timeoutHandler.postDelayed(barcodeTimeoutRunnable, SCAN_TIMEOUT_MS);
+    }
+
+    private void stopBarcodeScan() {
+        if (!barcodeScanState) return;
+        barcodeScanState = false;
+
+        // Cancel the timer
+        if (barcodeTimeoutRunnable != null) {
+            timeoutHandler.removeCallbacks(barcodeTimeoutRunnable);
+            barcodeTimeoutRunnable = null;
+        }
+
+        // Send explicit STOP command
+        triggerHardware(ACTION_EXTRA_SOFT_SCAN_TRIGGER, TRIGGER_STOP);
+
+        dismissProgressDialog();
     }
 
     @Override
@@ -544,6 +671,11 @@ public class RWDemoActivity extends Activity implements OnClickListener,    OnMe
 
         if (DEBUG) Log.d(TAG, "ECRT: handleDecodeData data=" + data + " source=" + source);
 
+        if(source.contains("scanner")){
+            playSuccessBeep();
+            dismissProgressDialog();
+        }
+
         int data_len = 0;
         if (data != null)
             data_len = data.length();
@@ -559,6 +691,11 @@ public class RWDemoActivity extends Activity implements OnClickListener,    OnMe
         }
 
         if (data_len > 0) {
+            // Update counts
+            totalTags++;
+            uniqueTags.add(data);
+            updateCountUI();
+
             TextView tv = (TextView) findViewById(R.id.output_view);
             if (tvText.length() > 0) {
                 tvText += ENDLINE_CHAR;
@@ -571,6 +708,12 @@ public class RWDemoActivity extends Activity implements OnClickListener,    OnMe
                 ScrollView svr = (ScrollView) findViewById(R.id.scrollView1);
                 svr.fullScroll(View.FOCUS_DOWN);
             });
+
+            // Dismiss progress and stop timer when data is received
+            if (SOURCE_SCANNER.equalsIgnoreCase(source)) {
+                stopBarcodeScan();
+            }
+            // For RFID we keep progress until timeout or manual stop
         }
         setIntent(null);
         mDataIntent = null;
@@ -680,6 +823,11 @@ public class RWDemoActivity extends Activity implements OnClickListener,    OnMe
                 String activeProfile = intent.getStringExtra(RESULT_GET_ACTIVE_PROFILE);
                 if(BUNDLE_EXTRA_PROFILE_NAME_VAL.equals(activeProfile)) {
                     if (DEBUG) Log.d(TAG, "ECRT: DW Activated Profile = " + activeProfile);
+                    
+                    if (!rwDemoProfileActivated) {
+                        playSuccessBeep();
+                    }
+                    
                     rwDemoProfileActivated = true;
                     softScanTrigger.setEnabled(true);
                     softScanTrigger.setAlpha(enabledButtonAlphaVlue);
@@ -716,12 +864,14 @@ public class RWDemoActivity extends Activity implements OnClickListener,    OnMe
                 String status = intent.getStringExtra(RESULT_SCANNER_STATUS);
                 if (DEBUG) Log.d(TAG, "ECRT: Scanner Status (Query Result) = " + status);
                 updateStatusUI(scannerStatusText, R.string.status_scanner, status);
+                if ("WAITING".equalsIgnoreCase(status)) dismissProgressDialog();
             }
 
             if (intent.hasExtra(RESULT_RFID_STATUS)) {
                 String status = intent.getStringExtra(RESULT_RFID_STATUS);
                 if (DEBUG) Log.d(TAG, "ECRT: Rfid Status (Query Result) = " + status);
                 updateStatusUI(rfidStatusText, R.string.status_rfid, status);
+                if ("WAITING".equalsIgnoreCase(status)) dismissProgressDialog();
             }
 
             if (intent.hasExtra(EXTRA_RESULT)) {
@@ -823,15 +973,65 @@ public class RWDemoActivity extends Activity implements OnClickListener,    OnMe
 
     private void updateStatusUI(TextView textView, int stringResId, String status) {
         runOnUiThread(() -> {
-            textView.setText(getString(stringResId, status));
             if (status == null) return;
+
+            String displayStatus = status;
+            // Map RFID statuses to READING/STOPPED for display
+            if (textView == rfidStatusText) {
+                if (STATUS_SCANNING.equalsIgnoreCase(status)) {
+                    displayStatus = getString(R.string.status_reading);
+                    rfidScanState = true;
+                } else {
+                    displayStatus = getString(R.string.status_stopped);
+                    rfidScanState = false;
+                    // Cancel timer if hardware stopped externally
+                    if (rfidTimeoutRunnable != null) {
+                        timeoutHandler.removeCallbacks(rfidTimeoutRunnable);
+                        rfidTimeoutRunnable = null;
+                    }
+                }
+            } else if (textView == scannerStatusText) {
+                if (!STATUS_SCANNING.equalsIgnoreCase(status)) {
+                    barcodeScanState = false;
+                    // Cancel timer if hardware stopped externally
+                    if (barcodeTimeoutRunnable != null) {
+                        timeoutHandler.removeCallbacks(barcodeTimeoutRunnable);
+                        barcodeTimeoutRunnable = null;
+                    }
+                }
+            }
+
+            textView.setText(getString(stringResId, displayStatus));
             
-            if (status.equalsIgnoreCase(STATUS_WAITING) || status.equalsIgnoreCase(STATUS_CONNECTED) || status.equalsIgnoreCase(STATUS_SCANNING)) {
+            if (status.equalsIgnoreCase(STATUS_WAITING) || status.equalsIgnoreCase(STATUS_CONNECTED) || status.equalsIgnoreCase(STATUS_SCANNING) ||
+                displayStatus.equalsIgnoreCase(getString(R.string.status_reading)) || displayStatus.equalsIgnoreCase(getString(R.string.status_stopped))) {
                 textView.setTextColor(getResources().getColor(R.color.status_green));
             } else if (status.equalsIgnoreCase(STATUS_ACTIVATED)) {
                 textView.setTextColor(getResources().getColor(R.color.status_blue));
             } else {
                 textView.setTextColor(getResources().getColor(R.color.status_red));
+            }
+            
+            // Fail-safe dismiss progress if status is WAITING or IDLE
+            if (STATUS_WAITING.equalsIgnoreCase(status) || "IDLE".equalsIgnoreCase(status)) {
+                dismissProgressDialog();
+            }
+        });
+    }
+
+    private void showProgressDialog(String message) {
+        runOnUiThread(() -> {
+            if (progressOverlay != null) {
+                progressMessageText.setText(message);
+                progressOverlay.setVisibility(View.VISIBLE);
+            }
+        });
+    }
+
+    private void dismissProgressDialog() {
+        runOnUiThread(() -> {
+            if (progressOverlay != null) {
+                progressOverlay.setVisibility(View.GONE);
             }
         });
     }
@@ -846,6 +1046,19 @@ public class RWDemoActivity extends Activity implements OnClickListener,    OnMe
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
+            }
+            toneGen.release();
+        }).start();
+    }
+
+    private void playSuccessBeep() {
+        new Thread(() -> {
+            ToneGenerator toneGen = new ToneGenerator(AudioManager.STREAM_MUSIC, 100);
+            toneGen.startTone(ToneGenerator.TONE_PROP_ACK, 400);
+            try {
+                Thread.sleep(400);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
             toneGen.release();
         }).start();

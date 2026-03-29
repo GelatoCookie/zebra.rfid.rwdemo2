@@ -1,5 +1,12 @@
 # RELEASE
 
+## Version: 0.0.2
+- Modularized DataWedge intent handling (DataWedgeHelper)
+- Improved user feedback (Toasts, dialogs)
+- Progress dialog for scanning operations
+- Documentation and onboarding improvements
+- Date: March 29, 2026
+
 ## Version: 0.0.1
 - Consolidated DataWedge Notification API for real-time hardware status monitoring.
 - Implemented dual-status UI for Barcode Scanner and RFID Sled.

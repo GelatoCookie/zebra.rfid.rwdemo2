@@ -106,13 +106,47 @@
             android:textStyle="bold" />
     </LinearLayout>
 
+    <!-- Count Bar -->
+    <LinearLayout
+        android:id="@+id/countLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/statusLayout"
+        android:orientation="horizontal"
+        android:paddingLeft="19dp"
+        android:paddingRight="19dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:background="#EEEEEE">
+
+        <TextView
+            android:id="@+id/uniqueCountText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Unique: 0"
+            android:textColor="#333333"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/totalCountText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Total: 0"
+            android:textColor="#333333"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
     <!-- results window -->
 
     <ScrollView
         android:id="@+id/scrollView1"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@+id/statusLayout"
+        android:layout_below="@+id/countLayout"
         android:layout_marginBottom="61dp"
         android:background="@drawable/bg_layered_textview"
         android:fillViewport="true"
@@ -197,5 +231,42 @@
         android:layout_height="50dp"
         android:layout_centerInParent="true"
         android:visibility="gone" />
+
+    <!-- Modern Progress Overlay -->
+    <RelativeLayout
+        android:id="@+id/progressOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#80000000"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:background="@android:color/transparent"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="24dp">
+
+            <ProgressBar
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:indeterminate="true"
+                android:indeterminateTint="@android:color/white" />
+
+            <TextView
+                android:id="@+id/progressMessage"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Reading..."
+                android:textColor="@android:color/white"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </RelativeLayout>
 
 </RelativeLayout>
