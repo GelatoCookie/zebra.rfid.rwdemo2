@@ -11,6 +11,7 @@ package com.zebra.rfid.rwdemo2;
 public class RWDemoIntentParams {
 
     public static final String ACTION_EXTRA_SOFT_RFID_TRIGGER = "com.symbol.datawedge.api.SOFT_RFID_TRIGGER";
+    public static final String ACTION_EXTRA_SOFT_SCAN_TRIGGER = "com.symbol.datawedge.api.SOFT_SCAN_TRIGGER";
 
     public static final String ACTION  = "com.symbol.datawedge.api.ACTION";
     public static final String RESULT_ACTION  = "com.symbol.datawedge.api.RESULT_ACTION";
@@ -62,6 +63,10 @@ public class RWDemoIntentParams {
     public final static String PLUGIN_RFID_F_ENABLE_PARAM = "rfidf_enabled";
     public static final String RFID_TAG_READ_DURATION_PARAM = "rfidf_tag_read_duration";
 
+    // Barcode Plugin params
+    public final static String PLUGIN_NAME_BARCODE = "BARCODE";
+    public final static String BARCODE_ENABLE_PARAM_KEY = "scanner_input_enabled";
+
     // Output plugin params
     public final static String PLUGIN_NAME_INTENT = "INTENT";
     public static final String BUNDLE_EXTRA_OUTPUT_PLUGIN_NAME = "OUTPUT_PLUGIN_NAME";
@@ -97,7 +102,44 @@ public class RWDemoIntentParams {
     public static final String GET_ACTIVE_PROFILE = "com.symbol.datawedge.api.GET_ACTIVE_PROFILE";
     public static final String RESULT_GET_ACTIVE_PROFILE = "com.symbol.datawedge.api.RESULT_GET_ACTIVE_PROFILE";
 
+    // Notification API
+    public static final String ACTION_EXTRA_REGISTER_FOR_NOTIFICATION = "com.symbol.datawedge.api.REGISTER_FOR_NOTIFICATION";
+    public static final String ACTION_EXTRA_UNREGISTER_FOR_NOTIFICATION = "com.symbol.datawedge.api.UNREGISTER_FOR_NOTIFICATION";
+    public static final String NOTIFICATION_ACTION = "com.symbol.datawedge.api.NOTIFICATION_ACTION";
+    public static final String NOTIFICATION_BUNDLE = "com.symbol.datawedge.api.NOTIFICATION_BUNDLE";
 
+    // Registration Bundle Keys
+    public static final String BUNDLE_EXTRA_APPLICATION_NAME = "com.symbol.datawedge.api.APPLICATION_NAME";
+    public static final String BUNDLE_EXTRA_NOTIFICATION_TYPE = "com.symbol.datawedge.api.NOTIFICATION_TYPE";
+
+    // Notification Result Keys (inside the bundle)
+    public static final String KEY_NOTIFICATION_TYPE = "NOTIFICATION_TYPE";
+    public static final String KEY_NOTIFICATION_STATUS = "STATUS";
+
+    public static final String NOTIFICATION_TYPE_SCANNER_STATUS = "SCANNER_STATUS";
+    public static final String NOTIFICATION_TYPE_RFID_STATUS = "RFID_STATUS";
+
+    // Query Actions
+    public static final String ACTION_EXTRA_GET_SCANNER_STATUS = "com.symbol.datawedge.api.GET_SCANNER_STATUS";
+    public static final String ACTION_EXTRA_GET_RFID_STATUS = "com.symbol.datawedge.api.GET_RFID_STATUS";
+
+    // Result Actions Extras
+    public static final String EXTRA_SEND_RESULT = "SEND_RESULT";
+    public static final String EXTRA_COMMAND_IDENTIFIER = "COMMAND_IDENTIFIER";
+    public static final String EXTRA_RESULT = "RESULT";
+    public static final String EXTRA_RESULT_INFO = "RESULT_INFO";
+
+    // Query Result Extras
+    public static final String RESULT_SCANNER_STATUS = "com.symbol.datawedge.api.RESULT_SCANNER_STATUS";
+    public static final String RESULT_RFID_STATUS = "com.symbol.datawedge.api.RESULT_RFID_STATUS";
+
+    // Status Values
+    public static final String STATUS_WAITING = "WAITING";
+    public static final String STATUS_SCANNING = "SCANNING";
+    public static final String STATUS_DISABLED = "DISABLED";
+    public static final String STATUS_CONNECTED = "CONNECTED";
+    public static final String STATUS_DISCONNECTED = "DISCONNECTED";
+    public static final String STATUS_ACTIVATED = "Activated";
 
     // RFID configuration
     public final static String INTENT_KEY_SESSION = "rfid_session";
@@ -107,4 +149,3 @@ public class RWDemoIntentParams {
 
 
 }
-

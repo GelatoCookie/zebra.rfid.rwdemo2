@@ -15,6 +15,8 @@ import android.widget.LinearLayout;
 
 import java.util.ArrayList;
 
+import static com.zebra.rfid.rwdemo2.RWDemoIntentParams.*;
+
 /**
  * Shows the FriendlyProfiles view of the RWDemo application and when the profile
  * selected this will sent a broadcast intent to change RFID setting of the DataWedge app
@@ -114,46 +116,46 @@ public class FriendlyProfilesActivity extends AppCompatActivity {
     private void createProfileWithPreset(String session, String antennaTransmitPower, String linkProfile, String dynamicPower) {
 
         Bundle setConfigBundle = new Bundle();
-        setConfigBundle.putString(RWDemoIntentParams.BUNDLE_EXTRA_PROFILE_NAME_KEY, RWDemoIntentParams.BUNDLE_EXTRA_PROFILE_NAME_VAL);
-        setConfigBundle.putString(RWDemoIntentParams.BUNDLE_EXTRA_CONFIG_MODE_KEY, RWDemoIntentParams.BUNDLE_EXTRA_CONFIG_MODE_VAL);
-        setConfigBundle.putString(RWDemoIntentParams.BUNDLE_EXTRA_PROFILE_ENABLED_KEY, RWDemoIntentParams.BUNDLE_EXTRA_PROFILE_ENABLED_VAL);
-        setConfigBundle.putString(RWDemoIntentParams.BUNDLE_EXTRA_RESET_CONFIG_KEY, RWDemoIntentParams.BUNDLE_EXTRA_RESET_CONFIG_VAL);
+        setConfigBundle.putString(BUNDLE_EXTRA_PROFILE_NAME_KEY, BUNDLE_EXTRA_PROFILE_NAME_VAL);
+        setConfigBundle.putString(BUNDLE_EXTRA_CONFIG_MODE_KEY, BUNDLE_EXTRA_CONFIG_MODE_VAL);
+        setConfigBundle.putString(BUNDLE_EXTRA_PROFILE_ENABLED_KEY, BUNDLE_EXTRA_PROFILE_ENABLED_VAL);
+        setConfigBundle.putString(BUNDLE_EXTRA_RESET_CONFIG_KEY, BUNDLE_EXTRA_RESET_CONFIG_VAL);
 
         // Associate profile with this app
         Bundle appConfig = new Bundle();
-        appConfig.putString(RWDemoIntentParams.BUNDLE_EXTRA_PACKAGE_NAME_KEY, getPackageName());
-        appConfig.putStringArray(RWDemoIntentParams.BUNDLE_EXTRA_ACTIVITY_LIST_KEY, RWDemoIntentParams.BUNDLE_EXTRA_ACTIVITY_LIST_VAL_ARR);
-        setConfigBundle.putParcelableArray(RWDemoIntentParams.BUNDLE_EXTRA_APP_LIST_KEY, new Bundle[]{appConfig});
-        setConfigBundle.remove(RWDemoIntentParams.BUNDLE_EXTRA_PLUGIN_CONFIG);
+        appConfig.putString(BUNDLE_EXTRA_PACKAGE_NAME_KEY, getPackageName());
+        appConfig.putStringArray(BUNDLE_EXTRA_ACTIVITY_LIST_KEY, BUNDLE_EXTRA_ACTIVITY_LIST_VAL_ARR);
+        setConfigBundle.putParcelableArray(BUNDLE_EXTRA_APP_LIST_KEY, new Bundle[]{appConfig});
+        setConfigBundle.remove(BUNDLE_EXTRA_PLUGIN_CONFIG);
 
         // RFID Input configurations
         Bundle rfidConigParamList = new Bundle();
-        rfidConigParamList.putString(RWDemoIntentParams.PLUGIN_ENABLE_PARAM_KEY, RWDemoIntentParams.PLUGIN_ENABLE_PARAM_VAL);
-        rfidConigParamList.putString(RWDemoIntentParams.INTENT_KEY_SESSION, session);
-        rfidConigParamList.putString(RWDemoIntentParams.INTENT_KEY_POWER_LEVEL, antennaTransmitPower);
-        rfidConigParamList.putString(RWDemoIntentParams.INTENT_KEY_RFID_LINK_PROFILE_PARAM, linkProfile);
-        rfidConigParamList.putString(RWDemoIntentParams.INTENT_KEY_RFID_DYNAMIC_POWER_MODE_ENABLED_PARAM, dynamicPower);
+        rfidConigParamList.putString(PLUGIN_ENABLE_PARAM_KEY, PLUGIN_ENABLE_PARAM_VAL);
+        rfidConigParamList.putString(INTENT_KEY_SESSION, session);
+        rfidConigParamList.putString(INTENT_KEY_POWER_LEVEL, antennaTransmitPower);
+        rfidConigParamList.putString(INTENT_KEY_RFID_LINK_PROFILE_PARAM, linkProfile);
+        rfidConigParamList.putString(INTENT_KEY_RFID_DYNAMIC_POWER_MODE_ENABLED_PARAM, dynamicPower);
 
         Bundle rfidConfigBundle = new Bundle();
-        rfidConfigBundle.putString(RWDemoIntentParams.BUNDLE_EXTRA_PLUGIN_NAME, RWDemoIntentParams.PLUGIN_NAME_RFID);
-        rfidConfigBundle.putString(RWDemoIntentParams.BUNDLE_EXTRA_RESET_CONFIG_KEY, RWDemoIntentParams.BUNDLE_EXTRA_RESET_CONFIG_VAL);
-        rfidConfigBundle.putBundle(RWDemoIntentParams.BUNDLE_EXTRA_PARAM_LIST, rfidConigParamList);
+        rfidConfigBundle.putString(BUNDLE_EXTRA_PLUGIN_NAME, PLUGIN_NAME_RFID);
+        rfidConfigBundle.putString(BUNDLE_EXTRA_RESET_CONFIG_KEY, BUNDLE_EXTRA_RESET_CONFIG_VAL);
+        rfidConfigBundle.putBundle(BUNDLE_EXTRA_PARAM_LIST, rfidConigParamList);
 
         Bundle rfidFormattingConfigBundle = new Bundle();
-        rfidFormattingConfigBundle.putString(RWDemoIntentParams.BUNDLE_EXTRA_PLUGIN_NAME, RWDemoIntentParams.PLUGIN_NAME_RFID_F);
-        rfidFormattingConfigBundle.putString(RWDemoIntentParams.BUNDLE_EXTRA_OUTPUT_PLUGIN_NAME, RWDemoIntentParams.PLUGIN_NAME_INTENT);
-        rfidFormattingConfigBundle.putString(RWDemoIntentParams.BUNDLE_EXTRA_RESET_CONFIG_KEY, RWDemoIntentParams.BUNDLE_EXTRA_RESET_CONFIG_VAL);
+        rfidFormattingConfigBundle.putString(BUNDLE_EXTRA_PLUGIN_NAME, PLUGIN_NAME_RFID_F);
+        rfidFormattingConfigBundle.putString(BUNDLE_EXTRA_OUTPUT_PLUGIN_NAME, PLUGIN_NAME_INTENT);
+        rfidFormattingConfigBundle.putString(BUNDLE_EXTRA_RESET_CONFIG_KEY, BUNDLE_EXTRA_RESET_CONFIG_VAL);
 
         // Configure intent output for captured data to be sent to this app
         Bundle intentConfig = new Bundle();
-        intentConfig.putString(RWDemoIntentParams.BUNDLE_EXTRA_PLUGIN_NAME, RWDemoIntentParams.PLUGIN_NAME_INTENT);
-        intentConfig.putString(RWDemoIntentParams.BUNDLE_EXTRA_RESET_CONFIG_KEY, RWDemoIntentParams.BUNDLE_EXTRA_RESET_CONFIG_VAL);
+        intentConfig.putString(BUNDLE_EXTRA_PLUGIN_NAME, PLUGIN_NAME_INTENT);
+        intentConfig.putString(BUNDLE_EXTRA_RESET_CONFIG_KEY, BUNDLE_EXTRA_RESET_CONFIG_VAL);
         Bundle intentProps = new Bundle();
-        intentProps.putString(RWDemoIntentParams.INTENT_OUTPUT_ENABLED_KEY, RWDemoIntentParams.INTENT_OUTPUT_ENABLED_VALUE);
-        intentProps.putString(RWDemoIntentParams.INTENT_ACTION_KEY, RWDemoIntentParams.INTENT_ACTION_VALUE);
-        intentProps.putString(RWDemoIntentParams.INTENT_CATEGORY_KEY, RWDemoIntentParams.INTENT_CATEGORY_VALUE);
-        intentProps.putString(RWDemoIntentParams.INTENT_DELIVERY_KEY, RWDemoIntentParams.INTENT_DELIVERY_VALUE);
-        intentConfig.putBundle(RWDemoIntentParams.BUNDLE_EXTRA_PARAM_LIST, intentProps);
+        intentProps.putString(INTENT_OUTPUT_ENABLED_KEY, INTENT_OUTPUT_ENABLED_VALUE);
+        intentProps.putString(INTENT_ACTION_KEY, INTENT_ACTION_VALUE);
+        intentProps.putString(INTENT_CATEGORY_KEY, INTENT_CATEGORY_VALUE);
+        intentProps.putString(INTENT_DELIVERY_KEY, INTENT_DELIVERY_VALUE);
+        intentConfig.putBundle(BUNDLE_EXTRA_PARAM_LIST, intentProps);
 
 
         ArrayList<Parcelable> configBundles = new ArrayList<>();
@@ -161,11 +163,13 @@ public class FriendlyProfilesActivity extends AppCompatActivity {
         configBundles.add(rfidFormattingConfigBundle);
         configBundles.add(intentConfig);
 
-        setConfigBundle.putParcelableArrayList(RWDemoIntentParams.BUNDLE_EXTRA_PLUGIN_CONFIG, configBundles);
+        setConfigBundle.putParcelableArrayList(BUNDLE_EXTRA_PLUGIN_CONFIG, configBundles);
 
         Intent profileSettingBroadcastIntent = new Intent();
-        profileSettingBroadcastIntent.setAction(RWDemoIntentParams.ACTION);
-        profileSettingBroadcastIntent.putExtra(RWDemoIntentParams.ACTION_EXTRA_SET_CONFIG, setConfigBundle);
+        profileSettingBroadcastIntent.setAction(ACTION);
+        profileSettingBroadcastIntent.putExtra(ACTION_EXTRA_SET_CONFIG, setConfigBundle);
+        profileSettingBroadcastIntent.putExtra(EXTRA_SEND_RESULT, "true");
+        profileSettingBroadcastIntent.putExtra(EXTRA_COMMAND_IDENTIFIER, "RFID_CONFIG");
         sendBroadcast(profileSettingBroadcastIntent);
     }
 

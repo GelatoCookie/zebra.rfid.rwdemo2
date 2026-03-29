@@ -1,8 +1,9 @@
 # RELEASE
 
-## Version: init
-- Initial codebase setup
-- Project structure established
-- Ready for development
-- Initial commit and repository setup
-- Date: March 28, 2026
+## Version: 0.0.1
+- Consolidated DataWedge Notification API for real-time hardware status monitoring.
+- Implemented dual-status UI for Barcode Scanner and RFID Sled.
+- Added explicit SET_CONFIG result handling to detect missing hardware.
+- Modernized status bar UI with color-coded indicators.
+- Fixed duplicate class and package name conflicts.
+- Date: April 2, 2026

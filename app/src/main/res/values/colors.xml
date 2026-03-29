@@ -26,4 +26,9 @@
    <color name="zebraGray">#808080</color>
    <color name="zebraLightBlue">#BBDEFB</color>
 
+   <color name="status_red">#FF0000</color>
+   <color name="status_green">#00C853</color>
+   <color name="status_blue">#2196F3</color>
+   <color name="status_text_dark">#333333</color>
+
 </resources>

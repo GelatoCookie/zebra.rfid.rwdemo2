@@ -14,4 +14,9 @@
     <string name="label_send_key">Send</string>
     <string name="color_picker_arrow">→</string>
 
+    <string name="status_scanner">Scanner: %1$s</string>
+    <string name="status_rfid">RFID: %1$s</string>
+    <string name="status_unknown">UNKNOWN</string>
+    <string name="status_no_plugin">No Plug-in</string>
+
 </resources>

@@ -19,10 +19,11 @@ fi
 
 echo "APK built at $APK_PATH"
 
-# 3. Find connected device
-DEVICE=$(adb devices | awk 'NR==2 {print $1}')
+
+# 3. Find first TCP wireless (non-emulator) device
+DEVICE=$(adb devices | grep '_adb-tls-connect._tcp' | awk '{print $1}' | head -n 1)
 if [ -z "$DEVICE" ]; then
-  echo "No device connected."
+  echo "No TCP wireless device connected."
   exit 1
 fi
 
