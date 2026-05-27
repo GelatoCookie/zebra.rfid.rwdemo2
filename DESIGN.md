@@ -264,16 +264,6 @@ private class SystemStateReceiver extends BroadcastReceiver {
                 restartOnUserPresent = true;
                 break;
 
-            case Intent.ACTION_SCREEN_ON:
-                new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                    Intent i = new Intent(RWDemoActivity.this, RWDemoActivity.class);
-                    i.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-                            | Intent.FLAG_ACTIVITY_SINGLE_TOP
-                            | Intent.FLAG_ACTIVITY_NEW_TASK);
-                    startActivity(i);
-                }, 100);
-                break;
-
             case Intent.ACTION_USER_PRESENT:
                 if (restartOnUserPresent) {
                     restartOnUserPresent = false;
@@ -301,10 +291,7 @@ Use this when:
 
 Current runtime behavior summary:
 - `ACTION_SCREEN_OFF`: stop active reads and set `restartOnUserPresent=true`.
-- `ACTION_SCREEN_ON`: proactively bring existing activity to front.
 - `ACTION_USER_PRESENT`: if flagged, perform full task restart using `NEW_TASK|CLEAR_TASK`; otherwise reorder-to-front.
-
-If you want stricter gating (only restart/relaunch after unlock), remove the `ACTION_SCREEN_ON` relaunch path and keep all relaunch logic under `ACTION_USER_PRESENT`.
 
 ### 5. WakeLock Behavior During Scanning
 
@@ -352,7 +339,6 @@ Suspend/resume test command examples:
 
 Expected behavior checklist:
 - Suspend: active scans stop and WakeLock is released.
-- Screen on: app is reordered to front.
 - Resume + unlock: app restarts if `restartOnUserPresent` is set; otherwise it is brought to front.
 - DataWedge notifications are re-registered by normal activity lifecycle (`onResume`).
 
@@ -372,66 +358,9 @@ Expected behavior checklist:
 
 ## Flowchart
 
-![RWDemo lifecycle and scan flow diagram](RWDemo-1.png)
-
 The Mermaid diagram below is the source of truth for lifecycle, WakeLock, and scan timeout behavior.
 
-```mermaid
-flowchart TD
-    Start([App Start])
-    CheckProfile{Profile Exists?}
-    CreateProfile[Create & Configure Profile]
-    RegisterNotif[Register for Notifications]
-    Ready[Ready for User Input]
-    RFIDBtn[User taps RFID Button]
-    BarcodeBtn[User taps Barcode Button]
-    StartRfid[startRfidScan()]
-    StartBarcode[startBarcodeScan()]
-    SendRFID[triggerHardware(ACTION_EXTRA_SOFT_RFID_TRIGGER, TRIGGER_START)]
-    SendBarcode[triggerHardware(ACTION_EXTRA_SOFT_SCAN_TRIGGER, TRIGGER_START)]
-    AcquireWakeLock[wakeLock.acquire(SCAN_TIMEOUT_MS + 2000)]
-    DW_RFID[DataWedge: Activate RFID]
-    DW_Barcode[DataWedge: Activate Barcode]
-    Timeout[Scan timeout or user stop]
-    StopRfid[stopRfidScan()]
-    StopBarcode[stopBarcodeScan()]
-    StopRFIDTrigger[triggerHardware(ACTION_EXTRA_SOFT_RFID_TRIGGER, TRIGGER_STOP)]
-    StopBarcodeTrigger[triggerHardware(ACTION_EXTRA_SOFT_SCAN_TRIGGER, TRIGGER_STOP)]
-    ReleaseWakeLock[wakeLock.release()]
-    NotifRFID[Receive RFID Status Notification]
-    NotifBarcode[Receive Barcode Status Notification]
-    UpdateUI[Update UI Status]
-    DataRFID[Receive RFID Data Intent]
-    DataBarcode[Receive Barcode Data Intent]
-    ShowRFID[Display Tag Data]
-    ShowBarcode[Display Barcode Data]
-    ScreenOff[Screen off event]
-    MarkRestart[Set restartOnUserPresent=true]
-    ScreenOn[Screen on event]
-    BringFront[Reorder activity to front]
-    UserPresent[User unlock event]
-    RestartNeeded{restartOnUserPresent?}
-    RestartTask[Restart with NEW_TASK + CLEAR_TASK]
-    QueryStatus[queryStatus()]
-
-    Start --> CheckProfile
-    CheckProfile -- No --> CreateProfile --> RegisterNotif --> Ready
-    CheckProfile -- Yes --> RegisterNotif --> Ready
-
-    Ready --> RFIDBtn --> StartRfid --> AcquireWakeLock --> SendRFID --> DW_RFID --> NotifRFID --> UpdateUI --> DataRFID --> ShowRFID
-    Ready --> BarcodeBtn --> StartBarcode --> AcquireWakeLock --> SendBarcode --> DW_Barcode --> NotifBarcode --> UpdateUI --> DataBarcode --> ShowBarcode
-
-    DW_RFID --> Timeout --> StopRfid --> StopRFIDTrigger --> ReleaseWakeLock --> Ready
-    DW_Barcode --> Timeout --> StopBarcode --> StopBarcodeTrigger --> ReleaseWakeLock --> Ready
-
-    Ready --> ScreenOff --> StopRfid
-    Ready --> ScreenOff --> StopBarcode
-    ScreenOff --> MarkRestart
-    Ready --> ScreenOn --> BringFront --> Ready
-    Ready --> UserPresent --> RestartNeeded
-    RestartNeeded -- Yes --> RestartTask --> QueryStatus --> Ready
-    RestartNeeded -- No --> BringFront --> QueryStatus --> Ready
-```
+![RWDemo lifecycle and scan flow diagram](RWDemo-1.png)
 
 ## Code Review Snapshot (May 2026)
 - Verified profile configuration constants in code match README DataWedge requirements (profile name, plugins, and intent output values).
@@ -440,4 +369,4 @@ flowchart TD
 
 ## Suggestions
 - Automated tests now cover intent construction, decode parsing, key status-handling branches, and an activity-level broadcast receiver path.
-- If strict unlock-gated lifecycle is required, remove the `ACTION_SCREEN_ON` relaunch path and keep relaunch/restart only in `ACTION_USER_PRESENT`.
+- Relaunch and restart are gated under `ACTION_USER_PRESENT` to avoid resume-side relaunch before unlock.

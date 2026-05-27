@@ -240,7 +240,6 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
         systemStateReceiver = new SystemStateReceiver();
         IntentFilter systemFilter = new IntentFilter();
         systemFilter.addAction(Intent.ACTION_SCREEN_OFF);
-        systemFilter.addAction(Intent.ACTION_SCREEN_ON);
         systemFilter.addAction(Intent.ACTION_USER_PRESENT);
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(systemStateReceiver, systemFilter, Context.RECEIVER_NOT_EXPORTED);
@@ -372,17 +371,6 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
                     restartOnUserPresent = true;
                     //moveTaskToBack(true);
                     //Log.d(TAG, "ECRT OS Event: moveTaskToBack!!!");
-                    break;
-
-                case Intent.ACTION_SCREEN_ON:
-                    // Code executed immediately when the system wakes up
-                    Log.d(TAG, "ECRT OS Event: Device woke up / Resuming.");
-                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                        Intent i = new Intent(RWDemoActivity.this, RWDemoActivity.class);
-                        i.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
-                        startActivity(i);
-                        Log.d(TAG, "ECRT: brought to front on screen on.");
-                    }, 100);
                     break;
 
                 case Intent.ACTION_USER_PRESENT:
@@ -740,13 +728,33 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
         }
     }
 
+    private void acquireWakeLockSafely() {
+        if (wakeLock == null || wakeLock.isHeld()) {
+            return;
+        }
+        try {
+            wakeLock.acquire(SCAN_TIMEOUT_MS + 2000); // Timeout as a safety measure
+        } catch (SecurityException e) {
+            Log.w(TAG, "WAKE_LOCK permission missing; continuing without WakeLock", e);
+        }
+    }
+
+    private void releaseWakeLockSafely() {
+        if (wakeLock == null || !wakeLock.isHeld()) {
+            return;
+        }
+        try {
+            wakeLock.release();
+        } catch (RuntimeException e) {
+            Log.w(TAG, "WakeLock release failed", e);
+        }
+    }
+
     private void startRfidScan() {
         if (rfidScanState) return; // Prevent double-clicks
         rfidScanState = true;
 
-        if (wakeLock != null && !wakeLock.isHeld()) {
-            wakeLock.acquire(SCAN_TIMEOUT_MS + 2000); // Timeout as a safety measure
-        }
+        acquireWakeLockSafely();
 
         showProgressDialog("Reading RFID... (Timeout in 5s)");
         updateStatusUI(rfidStatusText, R.string.status_rfid, STATUS_SCANNING);
@@ -784,9 +792,7 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
             dismissProgressDialog();
             updateStatusUI(rfidStatusText, R.string.status_rfid, STATUS_WAITING);
         } finally {
-            if (wakeLock != null && wakeLock.isHeld()) {
-                wakeLock.release();
-            }
+            releaseWakeLockSafely();
         }
     }
 
@@ -802,9 +808,7 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
         if (barcodeScanState) return;
         barcodeScanState = true;
 
-        if (wakeLock != null && !wakeLock.isHeld()) {
-            wakeLock.acquire(SCAN_TIMEOUT_MS + 2000); // Timeout as a safety measure
-        }
+        acquireWakeLockSafely();
 
         showProgressDialog("Reading Barcode... (Timeout in 5s)");
 
@@ -837,9 +841,7 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
 
             dismissProgressDialog();
         } finally {
-            if (wakeLock != null && wakeLock.isHeld()) {
-                wakeLock.release();
-            }
+            releaseWakeLockSafely();
         }
     }
 
