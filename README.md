@@ -1,7 +1,5 @@
 ## DataWedge Profile Requirements
 
-![RWDemo](RWDemo.png)
-
 This app depends on a DataWedge profile named **RWDemo**.
 
 At startup, the app sends `SET_CONFIG` with `CREATE_IF_NOT_EXIST` and attempts to configure the profile automatically. If auto-configuration fails (for example, due to device policy, missing plugin support, or DataWedge state), configure the profile manually using the required values below.
@@ -45,6 +43,8 @@ At startup, the app sends `SET_CONFIG` with `CREATE_IF_NOT_EXIST` and attempts t
 
 If profile creation or activation still fails, check device support for RFID and scanner plugins and confirm DataWedge is not restricted by device management policy.
 # DataWedge RFID/Barcode Demo App (ECRT)
+
+![RWDemo](RWDemo.png)
 
 ## Tested Platforms
 
