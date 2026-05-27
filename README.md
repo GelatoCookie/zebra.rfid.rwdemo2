@@ -1,16 +1,59 @@
 ## DataWedge Profile Requirements
 
-This app requires a DataWedge profile named `RWDemo` with the following configuration:
+This app depends on a DataWedge profile named **RWDemo**.
 
-- **RFID Input Plugin**: Enabled, with `rfid_input_enabled=true`.
-- **Barcode Input Plugin**: Enabled, with `scanner_input_enabled=true`.
-- **Intent Output Plugin**: Enabled, with output directed to this app's package and action `com.zebra.rfid.rwdemo.RWDEMO2`.
-- **Keystroke Output Plugin**: Optional, disabled by default.
-- **Associated Activities**: All activities in this app should be associated with the profile.
-- The app will auto-create and configure this profile if it does not exist.
+At startup, the app sends `SET_CONFIG` with `CREATE_IF_NOT_EXIST` and attempts to configure the profile automatically. If auto-configuration fails (for example, due to device policy, missing plugin support, or DataWedge state), configure the profile manually using the required values below.
 
-If you encounter issues with profile creation or hardware status, ensure DataWedge is installed and the device supports the required plugins.
+### Required Profile Values
+
+- **Profile name**: `RWDemo`
+- **Config mode**: `CREATE_IF_NOT_EXIST`
+- **Profile enabled**: `true`
+- **Associated app**: package `com.zebra.rfid.rwdemo2`, activity list `*`
+
+### Required Plugin Configuration
+
+- **RFID plugin (`RFID`)**: `rfid_input_enabled=true`
+- **RFID formatting plugin (`RFID_F`)**: output plugin name `INTENT`
+- **Barcode plugin (`BARCODE`)**: `scanner_input_enabled=true`
+- **Intent output plugin (`INTENT`)**:
+    - `intent_output_enabled=true`
+    - `intent_action=com.zebra.rfid.rwdemo.RWDEMO2`
+    - `intent_category=android.intent.category.DEFAULT`
+    - `intent_delivery=0`
+- **Keystroke output plugin (`KEYSTROKE`)**: `keystroke_output_enabled=false`
+
+### Manual Setup Steps (DataWedge UI)
+
+1. Open **DataWedge** on the device.
+2. Create or edit profile **RWDemo**.
+3. Associate the profile with app package **com.zebra.rfid.rwdemo2** and activity `*`.
+4. Enable plugins and set values exactly as listed in **Required Plugin Configuration**.
+5. Save the profile and relaunch the app.
+
+### Quick Verification Checklist
+
+- DataWedge is installed and enabled on the target device.
+- Profile **RWDemo** exists and is active for this app.
+- Triggering RFID/Barcode updates status indicators in-app.
+- Decoded data is delivered to action `com.zebra.rfid.rwdemo.RWDEMO2`.
+
+If profile creation or activation still fails, check device support for RFID and scanner plugins and confirm DataWedge is not restricted by device management policy.
 # DataWedge RFID/Barcode Demo App (ECRT)
+
+## Tested Platforms
+
+- EM45
+- TC53e-RFID
+- TC27-RFD40P
+
+## DataWedge/Firmware Compatibility Matrix
+
+| Device | DataWedge/Firmware | OS Build | Validation Date |
+| --- | --- | --- | --- |
+| EM45 | NA | Not recorded | May 2026 |
+| TC53e-RFID | NA | Not recorded | May 2026 |
+| TC27-RFD40P | 15.0.77 / 11R01 | AT_FULL_UPDATE_14-35-10.00-UG-U127-STD-ATH-04 | May 2026 |
 
 ## Directory Structure
 
@@ -35,15 +78,17 @@ GitHub: https://github.com/GelatoCookie/zebra.rfid.rwdemo2
 ---
 See [DESIGN.md](DESIGN.md) for detailed RFID and Barcode operation flows and architecture.
 
-## Version 0.0.2
+## Version 1.0.0
 
-This release includes improvements for modularity, user feedback, and scanning experience:
+This release includes production-ready onboarding, build/deploy automation, and a redesigned EPC results UI:
 
 ### What's New
-- **Modularized DataWedge Handling**: Introduced `DataWedgeHelper` class for cleaner, testable intent handling and configuration.
-- **Enhanced User Feedback**: Added Toasts and error dialogs for DataWedge errors and hardware status changes.
-- **Progress Dialog for Scanning**: Progress dialog now appears during barcode or RFID scanning and dismisses automatically when scanning completes or becomes idle.
-- **Documentation Updates**: Expanded README and DESIGN.md for onboarding and troubleshooting.
+- **Modern EPC Results UI**: Unique tags now render as styled per-row cards with index, EPC, and per-tag count badge.
+- **Count Visibility Update**: Top Unique/Total count bar is hidden to keep focus on per-tag cards.
+- **Count Threshold Styling**: Count badge color shifts by read volume for quick visual interpretation.
+- **Build/Deploy Script Hardening**: `build_deploy_launch.sh` now handles missing Gradle wrapper JAR and improved ADB device detection.
+- **Device Control Utility**: Added `suspend_resume_device.sh` for ADB suspend/resume workflows.
+- **Documentation Updates**: README and DESIGN updated for DataWedge profile requirements, tested devices, and compatibility notes.
 
 ### Key Features
 - **Real-time Hardware Status**: Uses DataWedge Notification API to monitor and display the state of the Barcode Scanner and RFID Sled.
@@ -62,13 +107,20 @@ This release includes improvements for modularity, user feedback, and scanning e
 ---
 ## Changelog
 
-### 0.0.2 (March 29, 2026)
+### 1.0.0 (May 26, 2026)
+- Modernized EPC list UI with per-tag card rows and count badges
+- Added count threshold badge coloring and simplified on-screen counters
+- Added `suspend_resume_device.sh` utility for ADB suspend/resume operations
+- Hardened `build_deploy_launch.sh` for wrapper recovery and robust device selection
+- Updated onboarding docs for DataWedge profile requirements and tested-platform compatibility
+
+### 0.0.2 (April 2, 2026)
 - Modularized DataWedge intent handling (DataWedgeHelper)
 - Improved user feedback (Toasts, dialogs)
 - Progress dialog for scanning operations
 - Documentation and onboarding improvements
 
-### 0.0.1 (April 2, 2026)
+### 0.0.1 (March 29, 2026)
 - Initial public release
 - Real-time hardware status, modern UI, robust configuration
 

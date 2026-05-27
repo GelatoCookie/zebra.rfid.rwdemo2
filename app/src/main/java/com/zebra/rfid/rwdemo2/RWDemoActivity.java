@@ -20,6 +20,7 @@ import android.graphics.PorterDuff.Mode;
 import android.graphics.Shader;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
 import android.graphics.drawable.ShapeDrawable;
 import android.media.AudioManager;
@@ -31,11 +32,13 @@ import android.os.Parcelable;
 import android.os.SystemClock;
 import android.text.SpannableString;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.KeyEvent;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.PopupMenu.OnMenuItemClickListener;
 import android.widget.ProgressBar;
@@ -46,7 +49,9 @@ import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static com.zebra.rfid.rwdemo2.RWDemoIntentParams.*;
@@ -56,7 +61,7 @@ import static com.zebra.rfid.rwdemo2.RWDemoIntentParams.*;
  * RWDemoActivity is  a demo application that designed to read RFID Tags.
  * To read RFID tags RWDemoActivity uses intent API of a DataWedge Application.
  */
-public class RWDemoActivity extends Activity implements OnClickListener,    OnMenuItemClickListener {
+public class  RWDemoActivity extends Activity implements OnClickListener,    OnMenuItemClickListener {
     private View progressOverlay;
     private TextView progressMessageText;
 
@@ -113,8 +118,11 @@ public class RWDemoActivity extends Activity implements OnClickListener,    OnMe
     private TextView rfidStatusText;
     private TextView uniqueCountText;
     private TextView totalCountText;
+    private TextView emptyTagsText;
+    private LinearLayout tagListContainer;
 
     private Set<String> uniqueTags = new HashSet<>();
+    private Map<String, Integer> tagCounts = new LinkedHashMap<>();
     private int totalTags = 0;
 
     private static int DW_DEMO_POPUP_MENU_SETTINGS = 1;
@@ -234,8 +242,8 @@ public class RWDemoActivity extends Activity implements OnClickListener,    OnMe
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_NOSENSOR);
         setMainBackground();
 
-        TextView tv = (TextView) findViewById(R.id.output_view);
-        tv.setText(tvText);
+        emptyTagsText = findViewById(R.id.emptyTagsText);
+        tagListContainer = findViewById(R.id.tagListContainer);
         scrollDown();
 
 
@@ -309,13 +317,83 @@ public class RWDemoActivity extends Activity implements OnClickListener,    OnMe
 
     private void clearData() {
         runOnUiThread(() -> {
-            TextView tv1 = (TextView) findViewById(R.id.output_view);
-            tv1.setText("");
             tvText = "";
             uniqueTags.clear();
+            tagCounts.clear();
             totalTags = 0;
+            renderTagRows();
             updateCountUI();
         });
+    }
+
+    private void renderTagRows() {
+        runOnUiThread(() -> {
+            if (tagListContainer == null || emptyTagsText == null) {
+                return;
+            }
+
+            tagListContainer.removeAllViews();
+
+            if (tagCounts.isEmpty()) {
+                emptyTagsText.setVisibility(View.VISIBLE);
+                return;
+            }
+
+            emptyTagsText.setVisibility(View.GONE);
+            StringBuilder sb = new StringBuilder();
+            int index = 1;
+            LayoutInflater inflater = LayoutInflater.from(this);
+
+            for (Map.Entry<String, Integer> entry : tagCounts.entrySet()) {
+                int rowIndex = index++;
+                int tagCount = entry.getValue();
+
+                if (sb.length() > 0) {
+                    sb.append(ENDLINE_CHAR);
+                }
+                sb.append(rowIndex)
+                        .append(") ")
+                        .append(entry.getKey())
+                        .append(" - count: ")
+                        .append(tagCount);
+
+                View row = inflater.inflate(R.layout.item_tag_count_row, tagListContainer, false);
+                TextView tagIndexText = row.findViewById(R.id.tagIndexText);
+                TextView tagEpcText = row.findViewById(R.id.tagEpcText);
+                TextView tagCountBadge = row.findViewById(R.id.tagCountBadge);
+
+                tagIndexText.setText(String.valueOf(rowIndex));
+                tagEpcText.setText(entry.getKey());
+                tagCountBadge.setText("x" + tagCount);
+
+                Drawable badgeBackground = tagCountBadge.getBackground();
+                if (badgeBackground instanceof GradientDrawable) {
+                    ((GradientDrawable) badgeBackground.mutate()).setColor(getBadgeColorForCount(tagCount));
+                }
+
+                tagListContainer.addView(row);
+            }
+
+            tvText = sb.toString();
+            ScrollView sv = (ScrollView) findViewById(R.id.scrollView1);
+            sv.post(() -> {
+                ScrollView svr = (ScrollView) findViewById(R.id.scrollView1);
+                svr.fullScroll(View.FOCUS_DOWN);
+            });
+        });
+    }
+
+    private int getBadgeColorForCount(int count) {
+        if (count >= 20) {
+            return Color.parseColor("#FFC62828");
+        }
+        if (count >= 10) {
+            return Color.parseColor("#FFEF6C00");
+        }
+        if (count >= 5) {
+            return Color.parseColor("#FF2E7D32");
+        }
+        return Color.parseColor("#FF007CB0");
     }
 
     private void updateCountUI() {
@@ -691,23 +769,13 @@ public class RWDemoActivity extends Activity implements OnClickListener,    OnMe
         }
 
         if (data_len > 0) {
-            // Update counts
+            // Update total and per-tag counters
             totalTags++;
             uniqueTags.add(data);
+            int tagCount = tagCounts.containsKey(data) ? tagCounts.get(data) + 1 : 1;
+            tagCounts.put(data, tagCount);
             updateCountUI();
-
-            TextView tv = (TextView) findViewById(R.id.output_view);
-            if (tvText.length() > 0) {
-                tvText += ENDLINE_CHAR;
-            }
-            tvText += data;
-
-            tv.setText(tvText);
-            ScrollView sv = (ScrollView) findViewById(R.id.scrollView1);
-            sv.post(() -> {
-                ScrollView svr = (ScrollView) findViewById(R.id.scrollView1);
-                svr.fullScroll(View.FOCUS_DOWN);
-            });
+            renderTagRows();
 
             // Dismiss progress and stop timer when data is received
             if (SOURCE_SCANNER.equalsIgnoreCase(source)) {
