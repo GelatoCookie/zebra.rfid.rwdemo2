@@ -29,6 +29,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Parcelable;
+import android.os.PowerManager;
 import android.os.SystemClock;
 import android.text.SpannableString;
 import android.util.Log;
@@ -37,6 +38,7 @@ import android.view.KeyEvent;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.view.WindowManager;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
@@ -130,8 +132,10 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
 
     private Intent mDataIntent = null;
     private boolean onNewIntentToOnResume;
+    private volatile boolean restartOnUserPresent;
     private long clickTime = 0;
-
+    private SystemStateReceiver systemStateReceiver;
+    private PowerManager.WakeLock wakeLock;
 
     private void createProfile() {
 
@@ -213,6 +217,10 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Keep screen on while this activity is in the foreground
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
         onNewIntentToOnResume = false;
         if (savedInstanceState == null) {
             Intent intent = getIntent();
@@ -225,6 +233,26 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
         } else {
             mDataIntent = savedInstanceState.getParcelable(DATA_INTENT);
             tvText = savedInstanceState.getString(DATA_TXT);
+        }
+
+        /// ///////////////////////////////////////
+        // Initialize the receiver instance
+        systemStateReceiver = new SystemStateReceiver();
+        IntentFilter systemFilter = new IntentFilter();
+        systemFilter.addAction(Intent.ACTION_SCREEN_OFF);
+        systemFilter.addAction(Intent.ACTION_SCREEN_ON);
+        systemFilter.addAction(Intent.ACTION_USER_PRESENT);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(systemStateReceiver, systemFilter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(systemStateReceiver, systemFilter);
+        }
+        Log.d(TAG, "ECRT: Receiver registered.");
+
+        // Initialize WakeLock for background execution (screen off)
+        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        if (pm != null) {
+            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "RWDemo:ScanWakeLock");
         }
 
         setContentView(R.layout.dwdemo_main);
@@ -328,6 +356,57 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
         });
     }
 
+    // Inner class handling the OS broadcast events
+    private class SystemStateReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (action == null) return;
+
+            switch (action) {
+                case Intent.ACTION_SCREEN_OFF:
+                    // Code executed right before the SoC enters its low-power suspend mode
+                    Log.d(TAG, "ECRT OS Event: Device went to sleep / Suspending.");
+                    stopRfidScan();
+                    stopBarcodeScan();
+                    restartOnUserPresent = true;
+                    //moveTaskToBack(true);
+                    //Log.d(TAG, "ECRT OS Event: moveTaskToBack!!!");
+                    break;
+
+                case Intent.ACTION_SCREEN_ON:
+                    // Code executed immediately when the system wakes up
+                    Log.d(TAG, "ECRT OS Event: Device woke up / Resuming.");
+                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                        Intent i = new Intent(RWDemoActivity.this, RWDemoActivity.class);
+                        i.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(i);
+                        Log.d(TAG, "ECRT: brought to front on screen on.");
+                    }, 100);
+                    break;
+
+                case Intent.ACTION_USER_PRESENT:
+                    // Executed when the user successfully unlocks the lock screen
+                    Log.d(TAG, "ECRT OS Event: User unlocked device / Fully interactive.");
+                    if (restartOnUserPresent) {
+                        restartOnUserPresent = false;
+                        Intent i = new Intent(RWDemoActivity.this, RWDemoActivity.class);
+                        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                        startActivity(i);
+                        finishAffinity();
+                        Log.d(TAG, "ECRT: relaunched activity after unlock.");
+                    } else {
+                        // Fallback if already relaunched or no restart needed: just bring to front/focus
+                        Intent i = new Intent(RWDemoActivity.this, RWDemoActivity.class);
+                        i.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(i);
+                    }
+                    queryStatus();
+                    break;
+            }
+        }
+    }
+
     private void renderTagRows() {
         runOnUiThread(() -> {
             if (tagListContainer == null || emptyTagsText == null) {
@@ -425,6 +504,7 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
 
     @Override
     public void onResume() {
+        Log.d(TAG, "onResume");
         super.onResume();
         rwDemoProfileActivated = false;
 
@@ -498,9 +578,9 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
 
     }
 
-
     @Override
-    public void onStart() {
+    protected void onStart() {
+        Log.d(TAG, "onStart");
         super.onStart();
     }
 
@@ -547,6 +627,10 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (systemStateReceiver != null) {
+            unregisterReceiver(systemStateReceiver);
+            Log.d(TAG, "ECRT: Receiver unregistered.");
+        }
         System.gc();
     }
 
@@ -660,6 +744,10 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
         if (rfidScanState) return; // Prevent double-clicks
         rfidScanState = true;
 
+        if (wakeLock != null && !wakeLock.isHeld()) {
+            wakeLock.acquire(SCAN_TIMEOUT_MS + 2000); // Timeout as a safety measure
+        }
+
         showProgressDialog("Reading RFID... (Timeout in 5s)");
         updateStatusUI(rfidStatusText, R.string.status_rfid, STATUS_SCANNING);
 
@@ -683,17 +771,23 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
         if (!rfidScanState) return;
         rfidScanState = false;
 
-        // CRITICAL: Cancel the timer so it doesn't fire anyway
-        if (rfidTimeoutRunnable != null) {
-            timeoutHandler.removeCallbacks(rfidTimeoutRunnable);
-            rfidTimeoutRunnable = null;
+        try {
+            // CRITICAL: Cancel the timer so it doesn't fire anyway
+            if (rfidTimeoutRunnable != null) {
+                timeoutHandler.removeCallbacks(rfidTimeoutRunnable);
+                rfidTimeoutRunnable = null;
+            }
+
+            // Send explicit STOP command
+            triggerHardware(ACTION_EXTRA_SOFT_RFID_TRIGGER, TRIGGER_STOP);
+
+            dismissProgressDialog();
+            updateStatusUI(rfidStatusText, R.string.status_rfid, STATUS_WAITING);
+        } finally {
+            if (wakeLock != null && wakeLock.isHeld()) {
+                wakeLock.release();
+            }
         }
-
-        // Send explicit STOP command
-        triggerHardware(ACTION_EXTRA_SOFT_RFID_TRIGGER, TRIGGER_STOP);
-
-        dismissProgressDialog();
-        updateStatusUI(rfidStatusText, R.string.status_rfid, STATUS_WAITING);
     }
 
     private void toggleSoftBarcodeTrigger() {
@@ -707,6 +801,10 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
     private void startBarcodeScan() {
         if (barcodeScanState) return;
         barcodeScanState = true;
+
+        if (wakeLock != null && !wakeLock.isHeld()) {
+            wakeLock.acquire(SCAN_TIMEOUT_MS + 2000); // Timeout as a safety measure
+        }
 
         showProgressDialog("Reading Barcode... (Timeout in 5s)");
 
@@ -727,16 +825,22 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
         if (!barcodeScanState) return;
         barcodeScanState = false;
 
-        // Cancel the timer
-        if (barcodeTimeoutRunnable != null) {
-            timeoutHandler.removeCallbacks(barcodeTimeoutRunnable);
-            barcodeTimeoutRunnable = null;
+        try {
+            // Cancel the timer
+            if (barcodeTimeoutRunnable != null) {
+                timeoutHandler.removeCallbacks(barcodeTimeoutRunnable);
+                barcodeTimeoutRunnable = null;
+            }
+
+            // Send explicit STOP command
+            triggerHardware(ACTION_EXTRA_SOFT_SCAN_TRIGGER, TRIGGER_STOP);
+
+            dismissProgressDialog();
+        } finally {
+            if (wakeLock != null && wakeLock.isHeld()) {
+                wakeLock.release();
+            }
         }
-
-        // Send explicit STOP command
-        triggerHardware(ACTION_EXTRA_SOFT_SCAN_TRIGGER, TRIGGER_STOP);
-
-        dismissProgressDialog();
     }
 
     @Override

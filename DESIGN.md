@@ -181,9 +181,11 @@ public void onNewIntent(Intent i) {
 
 ```java
 private void handleDecodeData(Intent i) {
-    String data = i.getStringExtra(DATA_STRING_TAG);
-    String source = i.getStringExtra(SOURCE_TAG);
-    if (source == null) source = SOURCE_SCANNER;
+    if (i == null) return;
+
+    DataWedgeSupport.DecodedData decodedData = DataWedgeSupport.decode(i);
+    String data = decodedData.data;
+    String source = decodedData.source;
 
     if (data != null && data.length() > 0) {
         totalTags++;
@@ -196,8 +198,8 @@ private void handleDecodeData(Intent i) {
 ```
 
 How to use this pattern:
-- Read `com.symbol.datawedge.data_string` for decoded payload.
-- Read `com.symbol.datawedge.source` to distinguish scanner vs RFID.
+- Use `DataWedgeSupport.decode()` to normalize payload, source, and label type extraction.
+- Use decoded `source` to distinguish scanner vs RFID.
 - Update your UI state only after a non-empty payload arrives.
 
 ### 6. Registering for status notifications
@@ -241,6 +243,119 @@ Use this pattern when:
 - App updates UI status bar (color and text) based on notification.
 - Barcode data is received via intent and displayed in the output view.
 
+### 4. Suspend/Background and Resume/Restart Flow
+
+This project already handles screen suspend/resume events in `SystemStateReceiver`.
+On suspend, active scans are stopped and the app marks a restart request. On wake/unlock, the activity is brought to front and may be restarted.
+
+Current pattern in `RWDemoActivity`:
+
+```java
+private class SystemStateReceiver extends BroadcastReceiver {
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        String action = intent.getAction();
+        if (action == null) return;
+
+        switch (action) {
+            case Intent.ACTION_SCREEN_OFF:
+                stopRfidScan();
+                stopBarcodeScan();
+                restartOnUserPresent = true;
+                break;
+
+            case Intent.ACTION_SCREEN_ON:
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    Intent i = new Intent(RWDemoActivity.this, RWDemoActivity.class);
+                    i.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                            | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                            | Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(i);
+                }, 100);
+                break;
+
+            case Intent.ACTION_USER_PRESENT:
+                if (restartOnUserPresent) {
+                    restartOnUserPresent = false;
+                    Intent i = new Intent(RWDemoActivity.this, RWDemoActivity.class);
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                    startActivity(i);
+                    finishAffinity();
+                } else {
+                    Intent i = new Intent(RWDemoActivity.this, RWDemoActivity.class);
+                    i.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                            | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                            | Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(i);
+                }
+                queryStatus();
+                break;
+        }
+    }
+}
+```
+
+Use this when:
+- You want to stop hardware reads immediately on suspend.
+- You want to preserve task state and quickly return to the same activity instance.
+
+Current runtime behavior summary:
+- `ACTION_SCREEN_OFF`: stop active reads and set `restartOnUserPresent=true`.
+- `ACTION_SCREEN_ON`: proactively bring existing activity to front.
+- `ACTION_USER_PRESENT`: if flagged, perform full task restart using `NEW_TASK|CLEAR_TASK`; otherwise reorder-to-front.
+
+If you want stricter gating (only restart/relaunch after unlock), remove the `ACTION_SCREEN_ON` relaunch path and keep all relaunch logic under `ACTION_USER_PRESENT`.
+
+### 5. WakeLock Behavior During Scanning
+
+The app uses a `PARTIAL_WAKE_LOCK` named `RWDemo:ScanWakeLock` to keep CPU work alive while a scan is active, even if the screen state changes.
+
+Initialization in `onCreate()`:
+
+```java
+PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+if (pm != null) {
+    wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "RWDemo:ScanWakeLock");
+}
+```
+
+Acquire on scan start (RFID and barcode):
+
+```java
+if (wakeLock != null && !wakeLock.isHeld()) {
+    wakeLock.acquire(SCAN_TIMEOUT_MS + 2000);
+}
+```
+
+Release on scan stop in `finally` blocks:
+
+```java
+finally {
+    if (wakeLock != null && wakeLock.isHeld()) {
+        wakeLock.release();
+    }
+}
+```
+
+How this works end-to-end:
+- WakeLock is held only while a scan is in progress.
+- Scan timeout (`SCAN_TIMEOUT_MS`) stops scan and releases WakeLock automatically.
+- Manual stop paths also release WakeLock.
+- The `+2000ms` safety window allows cleanup/stop commands to finish before auto-release.
+
+Suspend/resume test command examples:
+
+```bash
+./suspend_resume_device.sh suspend
+./suspend_resume_device.sh resume
+```
+
+Expected behavior checklist:
+- Suspend: active scans stop and WakeLock is released.
+- Screen on: app is reordered to front.
+- Resume + unlock: app restarts if `restartOnUserPresent` is set; otherwise it is brought to front.
+- DataWedge notifications are re-registered by normal activity lifecycle (`onResume`).
+
 ## Practical Usage Notes
 
 - Keep `RWDemoIntentParams` as the source of truth for every DataWedge string.
@@ -257,6 +372,10 @@ Use this pattern when:
 
 ## Flowchart
 
+![RWDemo lifecycle and scan flow diagram](RWDemo-1.png)
+
+The Mermaid diagram below is the source of truth for lifecycle, WakeLock, and scan timeout behavior.
+
 ```mermaid
 flowchart TD
     Start([App Start])
@@ -266,10 +385,19 @@ flowchart TD
     Ready[Ready for User Input]
     RFIDBtn[User taps RFID Button]
     BarcodeBtn[User taps Barcode Button]
-    SendRFID[Send SOFT_RFID_TRIGGER Intent]
-    SendBarcode[Send SOFT_SCAN_TRIGGER Intent]
+    StartRfid[startRfidScan()]
+    StartBarcode[startBarcodeScan()]
+    SendRFID[triggerHardware(ACTION_EXTRA_SOFT_RFID_TRIGGER, TRIGGER_START)]
+    SendBarcode[triggerHardware(ACTION_EXTRA_SOFT_SCAN_TRIGGER, TRIGGER_START)]
+    AcquireWakeLock[wakeLock.acquire(SCAN_TIMEOUT_MS + 2000)]
     DW_RFID[DataWedge: Activate RFID]
     DW_Barcode[DataWedge: Activate Barcode]
+    Timeout[Scan timeout or user stop]
+    StopRfid[stopRfidScan()]
+    StopBarcode[stopBarcodeScan()]
+    StopRFIDTrigger[triggerHardware(ACTION_EXTRA_SOFT_RFID_TRIGGER, TRIGGER_STOP)]
+    StopBarcodeTrigger[triggerHardware(ACTION_EXTRA_SOFT_SCAN_TRIGGER, TRIGGER_STOP)]
+    ReleaseWakeLock[wakeLock.release()]
     NotifRFID[Receive RFID Status Notification]
     NotifBarcode[Receive Barcode Status Notification]
     UpdateUI[Update UI Status]
@@ -277,12 +405,32 @@ flowchart TD
     DataBarcode[Receive Barcode Data Intent]
     ShowRFID[Display Tag Data]
     ShowBarcode[Display Barcode Data]
+    ScreenOff[Screen off event]
+    MarkRestart[Set restartOnUserPresent=true]
+    ScreenOn[Screen on event]
+    BringFront[Reorder activity to front]
+    UserPresent[User unlock event]
+    RestartNeeded{restartOnUserPresent?}
+    RestartTask[Restart with NEW_TASK + CLEAR_TASK]
+    QueryStatus[queryStatus()]
 
     Start --> CheckProfile
     CheckProfile -- No --> CreateProfile --> RegisterNotif --> Ready
     CheckProfile -- Yes --> RegisterNotif --> Ready
-    Ready --> RFIDBtn --> SendRFID --> DW_RFID --> NotifRFID --> UpdateUI --> DataRFID --> ShowRFID
-    Ready --> BarcodeBtn --> SendBarcode --> DW_Barcode --> NotifBarcode --> UpdateUI --> DataBarcode --> ShowBarcode
+
+    Ready --> RFIDBtn --> StartRfid --> AcquireWakeLock --> SendRFID --> DW_RFID --> NotifRFID --> UpdateUI --> DataRFID --> ShowRFID
+    Ready --> BarcodeBtn --> StartBarcode --> AcquireWakeLock --> SendBarcode --> DW_Barcode --> NotifBarcode --> UpdateUI --> DataBarcode --> ShowBarcode
+
+    DW_RFID --> Timeout --> StopRfid --> StopRFIDTrigger --> ReleaseWakeLock --> Ready
+    DW_Barcode --> Timeout --> StopBarcode --> StopBarcodeTrigger --> ReleaseWakeLock --> Ready
+
+    Ready --> ScreenOff --> StopRfid
+    Ready --> ScreenOff --> StopBarcode
+    ScreenOff --> MarkRestart
+    Ready --> ScreenOn --> BringFront --> Ready
+    Ready --> UserPresent --> RestartNeeded
+    RestartNeeded -- Yes --> RestartTask --> QueryStatus --> Ready
+    RestartNeeded -- No --> BringFront --> QueryStatus --> Ready
 ```
 
 ## Code Review Snapshot (May 2026)
@@ -292,3 +440,4 @@ flowchart TD
 
 ## Suggestions
 - Automated tests now cover intent construction, decode parsing, key status-handling branches, and an activity-level broadcast receiver path.
+- If strict unlock-gated lifecycle is required, remove the `ACTION_SCREEN_ON` relaunch path and keep relaunch/restart only in `ACTION_USER_PRESENT`.
