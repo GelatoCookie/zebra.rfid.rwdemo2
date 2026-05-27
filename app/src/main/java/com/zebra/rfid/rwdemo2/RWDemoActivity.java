@@ -123,6 +123,7 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
 
     private Set<String> uniqueTags = new HashSet<>();
     private Map<String, Integer> tagCounts = new LinkedHashMap<>();
+    private Map<String, String> tagTypes = new LinkedHashMap<>();
     private int totalTags = 0;
 
     private static int DW_DEMO_POPUP_MENU_SETTINGS = 1;
@@ -320,6 +321,7 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
             tvText = "";
             uniqueTags.clear();
             tagCounts.clear();
+            tagTypes.clear();
             totalTags = 0;
             renderTagRows();
             updateCountUI();
@@ -347,13 +349,18 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
             for (Map.Entry<String, Integer> entry : tagCounts.entrySet()) {
                 int rowIndex = index++;
                 int tagCount = entry.getValue();
+                String data = entry.getKey();
+                String type = tagTypes.getOrDefault(data, "EPC");
 
                 if (sb.length() > 0) {
                     sb.append(ENDLINE_CHAR);
                 }
                 sb.append(rowIndex)
                         .append(") ")
-                        .append(entry.getKey())
+                        .append(data)
+                        .append(" [")
+                        .append(type)
+                        .append("]")
                         .append(" - count: ")
                         .append(tagCount);
 
@@ -361,10 +368,12 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
                 TextView tagIndexText = row.findViewById(R.id.tagIndexText);
                 TextView tagEpcText = row.findViewById(R.id.tagEpcText);
                 TextView tagCountBadge = row.findViewById(R.id.tagCountBadge);
+                TextView tagTypeLabel = row.findViewById(R.id.tagTypeLabel);
 
                 tagIndexText.setText(String.valueOf(rowIndex));
-                tagEpcText.setText(entry.getKey());
+                tagEpcText.setText(data);
                 tagCountBadge.setText("x" + tagCount);
+                tagTypeLabel.setText(type);
 
                 Drawable badgeBackground = tagCountBadge.getBackground();
                 if (badgeBackground instanceof GradientDrawable) {
@@ -744,8 +753,9 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
         DataWedgeSupport.DecodedData decodedData = DataWedgeSupport.decode(i);
         String data = decodedData.data;
         String source = decodedData.source;
+        String labelType = decodedData.labelType;
 
-        if (DEBUG) Log.d(TAG, "ECRT: handleDecodeData data=" + data + " source=" + source);
+        if (DEBUG) Log.d(TAG, "ECRT: handleDecodeData data=" + data + " source=" + source + " type=" + labelType);
 
         if (DataWedgeSupport.SOURCE_SCANNER.equalsIgnoreCase(source)){
             playSuccessBeep();
@@ -758,6 +768,14 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
             uniqueTags.add(data);
             int tagCount = tagCounts.containsKey(data) ? tagCounts.get(data) + 1 : 1;
             tagCounts.put(data, tagCount);
+
+            // Determine display type (Barcode type or "EPC" for RFID)
+            String displayType = "EPC";
+            if (DataWedgeSupport.SOURCE_SCANNER.equalsIgnoreCase(source)) {
+                displayType = (labelType != null && !labelType.isEmpty()) ? labelType : "Barcode";
+            }
+            tagTypes.put(data, displayType);
+
             updateCountUI();
             renderTagRows();
 

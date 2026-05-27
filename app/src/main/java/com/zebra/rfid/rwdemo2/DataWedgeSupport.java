@@ -36,10 +36,12 @@ final class DataWedgeSupport {
     static final class DecodedData {
         final String data;
         final String source;
+        final String labelType;
 
-        DecodedData(String data, String source) {
+        DecodedData(String data, String source, String labelType) {
             this.data = data;
             this.source = source;
+            this.labelType = labelType;
         }
     }
 
@@ -71,11 +73,12 @@ final class DataWedgeSupport {
 
     static DecodedData decode(Intent intent) {
         if (intent == null) {
-            return new DecodedData(null, SOURCE_SCANNER);
+            return new DecodedData(null, SOURCE_SCANNER, null);
         }
 
         String data = intent.getStringExtra(DATA_STRING_TAG);
         String source = intent.getStringExtra(SOURCE_TAG);
+        String labelType = intent.getStringExtra("com.symbol.datawedge.label_type");
         if (source == null) {
             source = SOURCE_SCANNER;
         }
@@ -87,7 +90,7 @@ final class DataWedgeSupport {
             }
         }
 
-        return new DecodedData(data, source);
+        return new DecodedData(data, source, labelType);
     }
 
     static StatusUiState resolveStatus(String target, String status, String readingText, String stoppedText) {
