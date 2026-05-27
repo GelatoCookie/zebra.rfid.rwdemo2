@@ -1,5 +1,15 @@
 # RELEASE
 
+## Version: 1.0.1
+- Updated suspend and resume lifecycle handling to improve foreground recovery and restart behavior after unlock.
+- Added restart gating state for unlock-driven relaunch flow (`restartOnUserPresent`).
+- Improved scan robustness with documented WakeLock acquire and release lifecycle during RFID and barcode operations.
+- Refreshed design documentation with method-level lifecycle and scan flow traceability.
+- Added and integrated updated lifecycle flow image (`RWDemo-1.png`) in design docs.
+- Build configuration cleanup for newer toolchains (manifest/property cleanup and Java compatibility updates).
+- Tag: v1.0.1
+- Date: May 27, 2026
+
 ## Version: 1.0.0
 - Modernized EPC result UI with per-tag card rows and count badges.
 - Added count threshold badge coloring for high-volume tag visibility.
