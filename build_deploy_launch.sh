@@ -14,6 +14,58 @@ ensure_cmd() {
   fi
 }
 
+usage() {
+  cat <<'EOF'
+Usage:
+  ./build_deploy_launch.sh [--connected-tests]
+
+Options:
+  --connected-tests   Run connectedDebugAndroidTest after install/launch.
+EOF
+}
+
+find_online_device() {
+  adb start-server >/dev/null
+  adb devices | awk 'NR>1 && $2=="device" {print $1; exit}'
+}
+
+require_online_device() {
+  local device
+  device="$(find_online_device)"
+  if [ -z "$device" ]; then
+    echo "No online ADB device found."
+    echo "Current adb devices output:"
+    adb devices -l || true
+    echo "Connect/authorize a device and ensure it shows as 'device' before running this script."
+    exit 1
+  fi
+  echo "$device"
+}
+
+RUN_CONNECTED_TESTS=false
+
+if [ "$#" -gt 1 ]; then
+  usage
+  exit 1
+fi
+
+if [ "$#" -eq 1 ]; then
+  case "$1" in
+    --connected-tests)
+      RUN_CONNECTED_TESTS=true
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1"
+      usage
+      exit 1
+      ;;
+  esac
+fi
+
 ensure_cmd adb
 
 # 1. Build the APK
@@ -41,12 +93,7 @@ echo "APK built at $APK_PATH"
 
 
 # 3. Find first connected online device (USB or TCP)
-adb start-server >/dev/null
-DEVICE=$(adb devices | awk 'NR>1 && $2=="device" {print $1; exit}')
-if [ -z "$DEVICE" ]; then
-  echo "No online ADB device found. Connect a device and ensure it shows as 'device' in 'adb devices'."
-  exit 1
-fi
+DEVICE="$(require_online_device)"
 
 PACKAGE_NAME="com.zebra.rfid.rwdemo2"
 
@@ -63,3 +110,9 @@ echo "Launching app..."
 adb -s "$DEVICE" shell monkey -p "$PACKAGE_NAME" -c android.intent.category.LAUNCHER 1
 
 echo "App launched on $DEVICE."
+
+if [ "$RUN_CONNECTED_TESTS" = true ]; then
+  echo "Running connected Android instrumentation tests on $DEVICE..."
+  ./gradlew connectedDebugAndroidTest
+  echo "Connected Android instrumentation tests completed."
+fi

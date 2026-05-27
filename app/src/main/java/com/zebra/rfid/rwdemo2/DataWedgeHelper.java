@@ -13,9 +13,7 @@ public class DataWedgeHelper {
     }
 
     public void sendDataWedgeIntent(String action, Bundle extras) {
-        Intent intent = new Intent();
-        intent.setAction(action);
-        if (extras != null) intent.putExtras(extras);
+        Intent intent = DataWedgeSupport.createDataWedgeIntent(action, extras);
         try {
             context.sendBroadcast(intent);
         } catch (Exception e) {
@@ -24,23 +22,15 @@ public class DataWedgeHelper {
     }
 
     public void sendProfileConfig(Bundle setConfigBundle) {
-        Bundle extras = new Bundle();
-        extras.putBundle(RWDemoIntentParams.ACTION_EXTRA_SET_CONFIG, setConfigBundle);
-        extras.putString(RWDemoIntentParams.EXTRA_SEND_RESULT, "true");
-        extras.putString(RWDemoIntentParams.EXTRA_COMMAND_IDENTIFIER, "RFID_CONFIG");
-        sendDataWedgeIntent(RWDemoIntentParams.ACTION, extras);
+        sendDataWedgeIntent(RWDemoIntentParams.ACTION, DataWedgeSupport.createSetConfigIntent(setConfigBundle).getExtras());
     }
 
     public void sendSoftRfidTrigger(boolean start) {
-        Bundle extras = new Bundle();
-        extras.putString(RWDemoIntentParams.ACTION_EXTRA_SOFT_RFID_TRIGGER, start ? "START_SCANNING" : "STOP_SCANNING");
-        sendDataWedgeIntent(RWDemoIntentParams.ACTION, extras);
+        sendDataWedgeIntent(RWDemoIntentParams.ACTION, DataWedgeSupport.createSoftTriggerIntent(RWDemoIntentParams.ACTION_EXTRA_SOFT_RFID_TRIGGER, start ? "START_SCANNING" : "STOP_SCANNING").getExtras());
     }
 
     public void sendSoftBarcodeTrigger(boolean start) {
-        Bundle extras = new Bundle();
-        extras.putString(RWDemoIntentParams.ACTION_EXTRA_SOFT_SCAN_TRIGGER, start ? "START_SCANNING" : "STOP_SCANNING");
-        sendDataWedgeIntent(RWDemoIntentParams.ACTION, extras);
+        sendDataWedgeIntent(RWDemoIntentParams.ACTION, DataWedgeSupport.createSoftTriggerIntent(RWDemoIntentParams.ACTION_EXTRA_SOFT_SCAN_TRIGGER, start ? "START_SCANNING" : "STOP_SCANNING").getExtras());
     }
 
     public void getAvailableProfiles() {

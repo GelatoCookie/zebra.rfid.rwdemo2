@@ -741,34 +741,18 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
         if (i == null)
             return;
 
-        String data = i.getStringExtra(DATA_STRING_TAG);
-
-        String source = i.getStringExtra(SOURCE_TAG);
-        if (source == null)
-            source = SOURCE_SCANNER;
+        DataWedgeSupport.DecodedData decodedData = DataWedgeSupport.decode(i);
+        String data = decodedData.data;
+        String source = decodedData.source;
 
         if (DEBUG) Log.d(TAG, "ECRT: handleDecodeData data=" + data + " source=" + source);
 
-        if(source.contains("scanner")){
+        if (DataWedgeSupport.SOURCE_SCANNER.equalsIgnoreCase(source)){
             playSuccessBeep();
             dismissProgressDialog();
         }
 
-        int data_len = 0;
-        if (data != null)
-            data_len = data.length();
-
-        if (data_len == 0) {
-            if (source.equalsIgnoreCase(SOURCE_MSR)) {
-                byte[] rawData = i.getByteArrayExtra(MSR_DATA_TAG);
-                if (rawData != null) {
-                    data = DATA_MSR;    //convert(rawData);
-                    data_len = data.length();
-                }
-            }
-        }
-
-        if (data_len > 0) {
+        if (data != null && !data.isEmpty()) {
             // Update total and per-tag counters
             totalTags++;
             uniqueTags.add(data);
@@ -778,7 +762,7 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
             renderTagRows();
 
             // Dismiss progress and stop timer when data is received
-            if (SOURCE_SCANNER.equalsIgnoreCase(source)) {
+            if (DataWedgeSupport.SOURCE_SCANNER.equalsIgnoreCase(source)) {
                 stopBarcodeScan();
             }
             // For RFID we keep progress until timeout or manual stop
@@ -1041,47 +1025,40 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
 
     private void updateStatusUI(TextView textView, int stringResId, String status) {
         runOnUiThread(() -> {
-            if (status == null) return;
+            if (status == null || textView == null) return;
 
-            String displayStatus = status;
-            // Map RFID statuses to READING/STOPPED for display
+            String target = textView == scannerStatusText ? DataWedgeSupport.SOURCE_SCANNER : "rfid";
+            DataWedgeSupport.StatusUiState state = DataWedgeSupport.resolveStatus(
+                    target,
+                    status,
+                    getString(R.string.status_reading),
+                    getString(R.string.status_stopped));
+
             if (textView == rfidStatusText) {
-                if (STATUS_SCANNING.equalsIgnoreCase(status)) {
-                    displayStatus = getString(R.string.status_reading);
-                    rfidScanState = true;
-                } else {
-                    displayStatus = getString(R.string.status_stopped);
-                    rfidScanState = false;
-                    // Cancel timer if hardware stopped externally
-                    if (rfidTimeoutRunnable != null) {
-                        timeoutHandler.removeCallbacks(rfidTimeoutRunnable);
-                        rfidTimeoutRunnable = null;
-                    }
+                rfidScanState = state.rfidScanActive;
+                if (!state.rfidScanActive && rfidTimeoutRunnable != null) {
+                    timeoutHandler.removeCallbacks(rfidTimeoutRunnable);
+                    rfidTimeoutRunnable = null;
                 }
             } else if (textView == scannerStatusText) {
-                if (!STATUS_SCANNING.equalsIgnoreCase(status)) {
-                    barcodeScanState = false;
-                    // Cancel timer if hardware stopped externally
-                    if (barcodeTimeoutRunnable != null) {
-                        timeoutHandler.removeCallbacks(barcodeTimeoutRunnable);
-                        barcodeTimeoutRunnable = null;
-                    }
+                barcodeScanState = state.barcodeScanActive;
+                if (!state.barcodeScanActive && barcodeTimeoutRunnable != null) {
+                    timeoutHandler.removeCallbacks(barcodeTimeoutRunnable);
+                    barcodeTimeoutRunnable = null;
                 }
             }
 
-            textView.setText(getString(stringResId, displayStatus));
-            
-            if (status.equalsIgnoreCase(STATUS_WAITING) || status.equalsIgnoreCase(STATUS_CONNECTED) || status.equalsIgnoreCase(STATUS_SCANNING) ||
-                displayStatus.equalsIgnoreCase(getString(R.string.status_reading)) || displayStatus.equalsIgnoreCase(getString(R.string.status_stopped))) {
+            textView.setText(getString(stringResId, state.displayStatus));
+
+            if (state.tone == DataWedgeSupport.UiTone.GREEN) {
                 textView.setTextColor(getResources().getColor(R.color.status_green));
-            } else if (status.equalsIgnoreCase(STATUS_ACTIVATED)) {
+            } else if (state.tone == DataWedgeSupport.UiTone.BLUE) {
                 textView.setTextColor(getResources().getColor(R.color.status_blue));
             } else {
                 textView.setTextColor(getResources().getColor(R.color.status_red));
             }
-            
-            // Fail-safe dismiss progress if status is WAITING or IDLE
-            if (STATUS_WAITING.equalsIgnoreCase(status) || "IDLE".equalsIgnoreCase(status)) {
+
+            if (state.dismissProgress) {
                 dismissProgressDialog();
             }
         });
