@@ -905,7 +905,7 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
 
             // Try to load the a package matching the name of our own package
             PackageInfo pInfo;
-            String versionInfo = "3.1";
+            String versionInfo = "1.0.2";
             int msgPadding = 5;
 
             String aboutTitle = context.getString(R.string.dwdemo2_about_title);
