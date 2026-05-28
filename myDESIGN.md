@@ -17,7 +17,11 @@ For onboarding and exact DataWedge profile values, see the DataWedge Profile Req
 | TC53e-RFID | NA | Not recorded | May 2026 |
 | TC27-RFD40P | 15.0.77 / 11R01 | AT_FULL_UPDATE_14-35-10.00-UG-U127-STD-ATH-04 | May 2026 |
 
-## Release 1.0.0 Highlights
+## Release 1.0.2 Highlights
+- On `ACTION_SCREEN_OFF`, the activity is moved to background with `moveTaskToBack(true)` after active scans are stopped.
+- Added explicit suspend transition logging for easier troubleshooting.
+- Updated user-facing app/version strings to `Rfid DW Demo v1.0.2`.
+- Refreshed legal/about copy to 2026 where applicable.
 - Modernized EPC result presentation with per-tag card rows (index, EPC value, and count badge).
 - Introduced count-threshold badge styling for quick high-volume tag detection.
 - Hidden top Unique/Total summary bar in favor of row-level count clarity.

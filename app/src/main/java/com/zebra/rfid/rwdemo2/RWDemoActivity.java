@@ -369,8 +369,8 @@ public class  RWDemoActivity extends Activity implements OnClickListener,    OnM
                     stopRfidScan();
                     stopBarcodeScan();
                     restartOnUserPresent = true;
-                    //moveTaskToBack(true);
-                    //Log.d(TAG, "ECRT OS Event: moveTaskToBack!!!");
+                    moveTaskToBack(true);
+                    Log.d(TAG, "ECRT OS Event: moveTaskToBack!!!");
                     break;
 
                 case Intent.ACTION_USER_PRESENT:

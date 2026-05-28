@@ -49,9 +49,15 @@ If profile creation or activation still fails, check device support for RFID and
 - TC27-RFD40P
   TC27-RFD40P | 15.0.77 / 11R01 | AT_FULL_UPDATE_14-35-10.00-UG-U127-STD-ATH-04 | May 2026 |
 
-## Version 1.0.0
+## Version 1.0.2
 
-This release includes production-ready onboarding, build/deploy automation, and a redesigned EPC results UI:
+This release includes suspend/resume behavior hardening and version/branding updates:
+
+### What's New
+- **Suspend UX Improvement**: On `ACTION_SCREEN_OFF`, the app now calls `moveTaskToBack(true)` after stopping active scans.
+- **Foreground Recovery Logging**: Added screen-off logging to simplify suspend/resume diagnostics.
+- **Version/Branding Refresh**: App label text updated to `Rfid DW Demo v1.0.2`.
+- **About/Legal Refresh**: Copyright text updated to 2026.
 
 ### Key Features
 - **Real-time Hardware Status**: Uses DataWedge Notification API to monitor and display the state of the Barcode Scanner and RFID Sled.

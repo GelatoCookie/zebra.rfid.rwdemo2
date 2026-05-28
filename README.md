@@ -83,11 +83,15 @@ GitHub: https://github.com/GelatoCookie/zebra.rfid.rwdemo2
 ---
 See [DESIGN.md](DESIGN.md) for detailed RFID and Barcode operation flows and architecture.
 
-## Version 1.0.0
+## Version 1.0.2
 
-This release includes production-ready onboarding, build/deploy automation, and a redesigned EPC results UI:
+This release includes suspend/resume behavior hardening and version/branding updates:
 
 ### What's New
+- **Suspend UX Improvement**: On `ACTION_SCREEN_OFF`, the app now calls `moveTaskToBack(true)` after stopping active scans, reducing foreground interruption during device suspend.
+- **Foreground Recovery Logging**: Added explicit screen-off logging for easier diagnostics of suspend/resume transitions.
+- **Version/Branding Refresh**: App display text updated to `Rfid DW Demo v1.0.2` in relevant string resources.
+- **About/Legal Refresh**: Copyright string updated to 2026.
 - **Modern EPC Results UI**: Unique tags now render as styled per-row cards with index, EPC, and per-tag count badge.
 - **Count Visibility Update**: Top Unique/Total count bar is hidden to keep focus on per-tag cards.
 - **Count Threshold Styling**: Count badge color shifts by read volume for quick visual interpretation.
@@ -111,6 +115,12 @@ This release includes production-ready onboarding, build/deploy automation, and 
 
 ---
 ## Changelog
+
+### 1.0.2 (May 27, 2026)
+- On screen-off, app now moves task to background after stopping RFID/barcode scans
+- Added explicit suspend transition logging in `SystemStateReceiver`
+- Updated app label/content-description strings to `Rfid DW Demo v1.0.2`
+- Updated DataWedge demo copyright text to 2026
 
 ### 1.0.0 (May 26, 2026)
 - Modernized EPC list UI with per-tag card rows and count badges
